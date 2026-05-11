@@ -1,17 +1,6 @@
 # pgpro-pytest-html-json-extractor
 A tool to extract json data from pytest-html report. Developed and maintained by Postgres Professional.
 
-### Command Line Arguments
-
-| Argument | Shorthand | Required | Description | Default |
-| :--- | :--- | :--- | :--- | :--- |
-| `--version` | | No | Show program's version number and exit | None |
-| `--out` | `-o` | Yes | Name of the output JSON file | None |
-| `--verbose` | `-v` | No | Level of logging verbosity | 3 |
-| `--no-check-json` | | No | Do not validate json data after extraction | None |
-| `--replace` | `-r` | No | Replace output if it exists | None |
-| `input` | | Yes | Positional argument for HTML file | None |
-
 ## Installation
 You can install the package directly from the repository (until it's published to PyPI):
 ```bash
@@ -27,6 +16,17 @@ Extract JSON from a report:
 ```bash
 pgpro-pytest-html-json-extractor report.html -o report.json
 ```
+
+### Command Line Arguments
+
+| Argument | Shorthand | Required | Description | Default |
+| :--- | :--- | :--- | :--- | :--- |
+| `--version` | | No | Show program's version number and exit | None |
+| `--out` | `-o` | Yes | Name of the output JSON file | None |
+| `--verbose` | `-v` | No | Level of logging verbosity | 3 |
+| `--no-check-json` | | No | Do not validate json data after extraction | None |
+| `--replace` | `-r` | No | Replace output if it exists | None |
+| `input` | | Yes | Positional argument for HTML file | None |
 
 ## Contributing
 1. Fork the repository.
