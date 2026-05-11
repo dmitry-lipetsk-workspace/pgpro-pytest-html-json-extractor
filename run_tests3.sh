@@ -8,7 +8,7 @@ echo "Python version: $(python --version)"
 echo "Pytest-html spec: $PYTEST_HTML_SPEC"
 
 # prepare python environment
-VENV_PATH="/tmp/merger_venv"
+VENV_PATH="/tmp/extractor_venv"
 rm -rf $VENV_PATH
 python -m venv "${VENV_PATH}"
 export VIRTUAL_ENV_DISABLE_PROMPT=1

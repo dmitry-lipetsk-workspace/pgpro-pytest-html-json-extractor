@@ -171,11 +171,11 @@ jobs:
     - name: Run
       run: |
         docker run -t \
-        -v ${{ github.workspace }}/${{ env.RUN_CFG__LOGS_DIR }}:/home/test/merger/logs \
+        -v ${{ github.workspace }}/${{ env.RUN_CFG__LOGS_DIR }}:/home/test/extractor/logs \
         "${{ env.RUN_CFG__DOCKER_IMAGE_NAME }}"
     - name: Upload Logs
       uses: actions/upload-artifact@v7
       if: always() # IT IS IMPORTANT!
       with:
-        name: pytest_html_report_merger--test_logs--${{ env.RUN_CFG__NOW }}-${{ env.BASE_SIGN }}-id${{ github.run_id }}
+        name: pytest_html_json_extractor--test_logs--${{ env.RUN_CFG__NOW }}-${{ env.BASE_SIGN }}-id${{ github.run_id }}
         path: "${{ env.RUN_CFG__LOGS_DIR }}/"

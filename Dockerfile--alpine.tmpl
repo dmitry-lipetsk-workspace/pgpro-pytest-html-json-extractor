@@ -14,7 +14,7 @@ RUN apk add bash
 
 RUN adduser -D test
 
-ADD --chown=test:test . /home/test/merger
+ADD --chown=test:test . /home/test/extractor
 WORKDIR /home/test/extractor
 RUN chmod +x run_tests3.sh
 
