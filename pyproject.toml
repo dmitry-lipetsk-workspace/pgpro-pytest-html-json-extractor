@@ -45,7 +45,7 @@ dependencies = [
 ]
 
 [project.urls]
-"HomePage" = "https://github.com/postgrespro/pgpro-pytest-html-merger"
+"HomePage" = "https://github.com/postgrespro/pgpro-pytest-html-json-extractor"
 
 [project.scripts]
 pgpro-pytest-html-json-extractor = "pgpro_pytest_html_json_extractor.__main__:cli"
