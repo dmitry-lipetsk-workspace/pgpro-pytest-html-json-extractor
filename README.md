@@ -11,6 +11,16 @@ A tool to extract json data from pytest-html report. Developed and maintained by
 | `--replace` | `-r` | No | Replace output if it exists | None |
 | `input` | | Yes | Positional argument for HTML file | None |
 
+## Installation
+You can install the package directly from the repository (until it's published to PyPI):
+```bash
+pip install pgpro-pytest-html-json-extractor
+```
+
+## Usage
+
+After installation, the tool is available via the pgpro-pytest-html-json-extractor command.
+
 ### Basic Examples
 Extract JSON from a report:
 ```bash
