@@ -11,6 +11,7 @@ import re
 import typing
 import html
 import dataclasses
+import enum
 
 from . import __version__ as current_version
 
@@ -19,6 +20,18 @@ from packaging.version import Version
 # //////////////////////////////////////////////////////////////////////////////
 
 g_log = logging.getLogger(__name__)
+
+
+# //////////////////////////////////////////////////////////////////////////////
+
+
+class UnescapeLogsMode(enum.Enum):
+    AUTO = "auto"
+    YES = "yes"
+    NO = "no"
+
+    def __str__(self):
+        return self.value
 
 
 # //////////////////////////////////////////////////////////////////////////////
@@ -83,10 +96,14 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     command_parser.add_argument(
-        "--no-unescape-logs",
+        "--unescape-logs",
         dest="unescape_logs",
-        action="store_false",
-        help="do not unescape HTML entities in logs",
+        type=UnescapeLogsMode,
+        choices=list(UnescapeLogsMode),
+        default=UnescapeLogsMode.AUTO,
+        help="Unescape HTML entities in logs (default: {})".format(
+            UnescapeLogsMode.AUTO.name,
+        ),
     )
 
     command_parser.add_argument(
@@ -147,7 +164,7 @@ class PytestHtmlJsonExtractor:
         check_json: bool,
         output_path: str,
         replace: bool,
-        unescape_logs: bool = True,
+        unescape_logs: UnescapeLogsMode = UnescapeLogsMode.AUTO,
     ):
         assert type(input_path) is str
         assert type(check_json) is bool
@@ -174,20 +191,32 @@ class PytestHtmlJsonExtractor:
             )
 
         if html_version >= Version("4.1.0"):
-            extractor_func = __class__._extract_json_from_html_4_1_0
+            adapter = __class__.sm_ReportAdapterForPytestHtml_4_1_0
         else:
-            extractor_func = __class__._extract_json_from_html_4_0_2
+            adapter = __class__.sm_ReportAdapterForPytestHtml_4_0_2
 
         extractCtx = __class__.tagExtractCtx(
             soup,
-            unescape_logs,
         )
 
-        jsonblob = extractor_func(extractCtx)
+        assert isinstance(adapter.extractor_func, typing.Callable)
+        jsonblob = adapter.extractor_func(extractCtx)
 
         # memory is freed
         del extractCtx
         del soup
+
+        if unescape_logs == UnescapeLogsMode.AUTO:
+            unescape_logs = adapter.escapes_log
+
+        assert unescape_logs != UnescapeLogsMode.AUTO
+
+        if unescape_logs == UnescapeLogsMode.NO:
+            g_log.debug("Html escapes is skipped ...")
+        else:
+            jsondata = json.loads(jsonblob)
+            __class__._inplace_unescape_logs__html4_1_0(jsondata)
+            jsonblob = json.dumps(jsondata, ensure_ascii=False)
 
         if check_json:
             g_log.info("Json data is checked...")
@@ -205,10 +234,9 @@ class PytestHtmlJsonExtractor:
     @dataclasses.dataclass
     class tagExtractCtx:
         soup: bs4.BeautifulSoup
-        unescape_logs: bool
 
     # --------------------------------------------------------------------
-    @staticmethod
+    # @staticmethod
     def _extract_json_from_html_4_0_2(ctx: tagExtractCtx):
         assert type(ctx) is __class__.tagExtractCtx
 
@@ -225,37 +253,6 @@ class PytestHtmlJsonExtractor:
             __class__._raise_err__json_blob_is_not_found()
 
         assert type(jsonblob) is str
-
-        if ctx.unescape_logs:
-            g_log.debug("Html escapes is not required ...")
-
-        return jsonblob
-
-    # --------------------------------------------------------------------
-    @staticmethod
-    def _extract_json_from_html_4_1_0(ctx: tagExtractCtx):
-        assert type(ctx) is __class__.tagExtractCtx
-
-        assert type(ctx) is __class__.tagExtractCtx
-
-        containers = ctx.soup.select("#data-container")
-        if not containers:
-            __class__._raise_err__json_blob_is_not_found()
-
-        report_data_container = containers[0]
-
-        jsonblob = report_data_container.get("data-jsonblob")
-
-        # ----------
-        if jsonblob is None:
-            __class__._raise_err__json_blob_is_not_found()
-
-        assert type(jsonblob) is str
-
-        if ctx.unescape_logs:
-            jsondata = json.loads(jsonblob)
-            __class__._inplace_unescape_logs__html4_1_0(jsondata)
-            jsonblob = json.dumps(jsondata, ensure_ascii=False)
 
         return jsonblob
 
@@ -353,6 +350,24 @@ class PytestHtmlJsonExtractor:
     def _raise_err__json_blob_is_not_found() -> typing.NoReturn:
         err_msg = "Source file does not countains json data."
         raise RuntimeError(err_msg)
+
+    # --------------------------------------------------------------------
+    @dataclasses.dataclass
+    class tagReportAdapter:
+        extractor_func: typing.Callable
+        escapes_log: UnescapeLogsMode
+
+    # --------------------------------------------------------------------
+    sm_ReportAdapterForPytestHtml_4_0_2 = tagReportAdapter(
+        extractor_func=_extract_json_from_html_4_0_2,
+        escapes_log=UnescapeLogsMode.NO,
+    )
+
+    # --------------------------------------------------------------------
+    sm_ReportAdapterForPytestHtml_4_1_0 = tagReportAdapter(
+        extractor_func=_extract_json_from_html_4_0_2,
+        escapes_log=UnescapeLogsMode.YES,
+    )
 
 
 # //////////////////////////////////////////////////////////////////////////////

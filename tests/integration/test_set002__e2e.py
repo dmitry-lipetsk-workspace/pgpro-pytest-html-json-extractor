@@ -270,12 +270,34 @@ def data002(request: pytest.FixtureRequest) -> tagData002:
 
 
 # ------------------------------------------------------------------------
-def test_e2e_002__unescape_html_in_log(data002: tagData002):
+def test_e2e_002__unescape_logs__DEFAULT(
+    data002: tagData002
+):
+    _test_e2e_002__unescape_logs(
+        data002,
+        False,
+    )  
+
+# ------------------------------------------------------------------------
+def test_e2e_002__unescape_logs__AUTO(
+    data002: tagData002
+):
+    _test_e2e_002__unescape_logs(
+        data002,
+        True,
+    )  
+
+# ------------------------------------------------------------------------
+def _test_e2e_002__unescape_logs(
+    data002: tagData002,
+    explicit_auto: bool,
+):
     """
     E2E Test: Generate one report quote output.
     Verifies that json does not has "&quot;".
     """
     assert type(data002) is tagData002
+    assert type(explicit_auto) is bool
 
     assert test_spec.TestSpec.can_run(data002.test_spec)
 
@@ -297,13 +319,19 @@ def test_e2e_002__unescape_html_in_log(data002: tagData002):
         # 2. Define output path and run extractor
         output_json = ws.root / "output_json.json"
         # We point to the directory where run1.html was generated
-        result = ws.run_extractor(
-            [
-                str(html),
-                "-o",
-                str(output_json),
+        cmd = [
+            str(html),
+            "-o",
+            str(output_json),
+        ]
+
+        if explicit_auto:
+            cmd += [
+                "--unescape-logs",
+                "auto",
             ]
-        )
+
+        result = ws.run_extractor(cmd)
 
         # 3. Assertions
         assert result.returncode == 0, f"Extractor failed: {result.stderr}"
@@ -694,7 +722,7 @@ def data004(request: pytest.FixtureRequest) -> tagData004:
 
 
 # ------------------------------------------------------------------------
-def test_e2e_004__NO_unescape_html_in_log(data004: tagData004):
+def test_e2e_004__unescape_logs__NO(data004: tagData004):
     """
     E2E Test: Generate one report quote output.
     Verifies that extractor does not touch log.
@@ -726,7 +754,8 @@ def test_e2e_004__NO_unescape_html_in_log(data004: tagData004):
                 str(html),
                 "-o",
                 str(output_json),
-                "--no-unescape-logs",
+                "--unescape-logs",
+                "no",
             ]
         )
 
