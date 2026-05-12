@@ -10,6 +10,7 @@ import sys
 import re
 import typing
 import html
+import dataclasses
 
 from . import __version__ as current_version
 
@@ -172,32 +173,21 @@ class PytestHtmlJsonExtractor:
                 html_version_s,
             )
 
-        # load json data from the current report
-        containers = soup.select("#data-container")
-        if not containers:
-            __class__._raise_err__json_blob_is_not_found(input_path)
+        if html_version >= Version("4.1.0"):
+            extractor_func = __class__._extract_json_from_html_4_1_0
+        else:
+            extractor_func = __class__._extract_json_from_html_4_0_2
 
-        report_data_container = containers[0]
+        extractCtx = __class__.tagExtractCtx(
+            soup,
+            unescape_logs,
+        )
 
-        jsonblob = report_data_container.get("data-jsonblob")
+        jsonblob = extractor_func(extractCtx)
 
         # memory is freed
-        del report_data_container
+        del extractCtx
         del soup
-
-        # ----------
-        if jsonblob is None:
-            __class__._raise_err__json_blob_is_not_found(
-                input_path,
-            )
-
-        assert type(jsonblob) is str
-
-        if unescape_logs:
-            jsondata = json.loads(jsonblob)
-            __class__._inplace_unescape_logs(html_version, jsondata)
-            jsonblob = json.dumps(jsondata, ensure_ascii=False)
-            del jsondata  # memory is freed
 
         if check_json:
             g_log.info("Json data is checked...")
@@ -212,19 +202,62 @@ class PytestHtmlJsonExtractor:
         return
 
     # --------------------------------------------------------------------
-    @staticmethod
-    def _inplace_unescape_logs(
-        html_version: Version,
-        jsondata: typing.Any,
-    ) -> None:
-        if html_version >= Version("4.1.0"):
-            return __class__._inplace_unescape_logs__html4_1_0(
-                jsondata,
-            )
+    @dataclasses.dataclass
+    class tagExtractCtx:
+        soup: bs4.BeautifulSoup
+        unescape_logs: bool
 
-        # it is old version
-        g_log.debug("Html escapes is not required ...")
-        return
+    # --------------------------------------------------------------------
+    @staticmethod
+    def _extract_json_from_html_4_0_2(ctx: tagExtractCtx):
+        assert type(ctx) is __class__.tagExtractCtx
+
+        containers = ctx.soup.select("#data-container")
+        if not containers:
+            __class__._raise_err__json_blob_is_not_found()
+
+        report_data_container = containers[0]
+
+        jsonblob = report_data_container.get("data-jsonblob")
+
+        # ----------
+        if jsonblob is None:
+            __class__._raise_err__json_blob_is_not_found()
+
+        assert type(jsonblob) is str
+
+        if ctx.unescape_logs:
+            g_log.debug("Html escapes is not required ...")
+
+        return jsonblob
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def _extract_json_from_html_4_1_0(ctx: tagExtractCtx):
+        assert type(ctx) is __class__.tagExtractCtx
+
+        assert type(ctx) is __class__.tagExtractCtx
+
+        containers = ctx.soup.select("#data-container")
+        if not containers:
+            __class__._raise_err__json_blob_is_not_found()
+
+        report_data_container = containers[0]
+
+        jsonblob = report_data_container.get("data-jsonblob")
+
+        # ----------
+        if jsonblob is None:
+            __class__._raise_err__json_blob_is_not_found()
+
+        assert type(jsonblob) is str
+
+        if ctx.unescape_logs:
+            jsondata = json.loads(jsonblob)
+            __class__._inplace_unescape_logs__html4_1_0(jsondata)
+            jsonblob = json.dumps(jsondata, ensure_ascii=False)
+
+        return jsonblob
 
     # --------------------------------------------------------------------
     @staticmethod
@@ -317,14 +350,8 @@ class PytestHtmlJsonExtractor:
 
     # --------------------------------------------------------------------
     @staticmethod
-    def _raise_err__json_blob_is_not_found(
-        report_path: str,
-    ) -> typing.NoReturn:
-        assert report_path is not None
-
-        err_msg = "Source file [{}] does not countains json data.".format(
-            report_path,
-        )
+    def _raise_err__json_blob_is_not_found() -> typing.NoReturn:
+        err_msg = "Source file does not countains json data."
         raise RuntimeError(err_msg)
 
 
