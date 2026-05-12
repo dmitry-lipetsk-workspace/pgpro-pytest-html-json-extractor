@@ -6,7 +6,16 @@ import dataclasses
 import typing
 
 from .e2eworkspace import E2EWorkspace
+from ..helpers import test_spec
+
 from importlib.metadata import version as get_package_version
+
+# //////////////////////////////////////////////////////////////////////////////
+
+
+def helper__raise_skip__test_is_not_applicable():
+    pytest.skip("The test is not applicable")
+
 
 # //////////////////////////////////////////////////////////////////////////////
 
@@ -90,6 +99,7 @@ def test_e2e_001__single_report_metadata():
 # ------------------------------------------------------------------------
 @dataclasses.dataclass
 class tagData002:
+    test_spec: typing.Optional[str]
     data: str
     in_html: str
     in_json: str
@@ -99,12 +109,21 @@ class tagData002:
 # ------------------------------------------------------------------------
 g_Data002: typing.List[tagData002] = [
     tagData002(
+        test_spec=None,
         data="text",
         in_html="text",
         in_json="text",
         sign="text",
     ),
     tagData002(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data='"text"',
+        in_html="\\&#34;text\\&#34;",
+        in_json='\\"text\\"',
+        sign="quoted_text__pytest_html4_0_2",
+    ),
+    tagData002(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data='"text"',
         in_html="&amp;quot;text&amp;quot;",
         in_json='\\"text\\"',
@@ -113,6 +132,14 @@ g_Data002: typing.List[tagData002] = [
     # Mark G. ------------------------------------------------------------
     # Case 1: Classic quotation marks (already tested, but let's keep it for now)
     tagData002(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data='{"msg": "simple quote"}',
+        in_html="{\\&#34;msg\\&#34;: \\&#34;simple quote\\&#34;}",
+        in_json='{\\"msg\\": \\"simple quote\\"}',
+        sign="simple_quote__pytest_html4_0_2",
+    ),
+    tagData002(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data='{"msg": "simple quote"}',
         in_html="{&amp;quot;msg&amp;quot;: &amp;quot;simple quote&amp;quot;}",
         in_json='{\\"msg\\": \\"simple quote\\"}',
@@ -120,6 +147,14 @@ g_Data002: typing.List[tagData002] = [
     ),
     # Case 2: That same "double" ampersand from the pytest-html logs
     tagData002(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data="Double &amp;quot;nested&amp;quot; test",
+        in_html="Double &amp;amp;quot;nested&amp;amp;quot;",
+        in_json="Double &amp;quot;nested&amp;quot; test",
+        sign="double_nested_quotes__pytest_html4_0_2",
+    ),
+    tagData002(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data="Double &amp;quot;nested&amp;quot; test",
         in_html="Double &amp;amp;amp;quot;nested&amp;amp;amp;quot;",
         in_json="Double &amp;quot;nested&amp;quot; test",
@@ -127,6 +162,14 @@ g_Data002: typing.List[tagData002] = [
     ),
     # Case 3: HTML tags that frequently appear in test results (e.g., browser output)
     tagData002(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data='<div class="test">Data</div>',
+        in_html="&lt;div class=\\&#34;test\\&#34;&gt;Data&lt;/div&gt;",
+        in_json='<div class=\\"test\\">Data</div>',
+        sign="html_tags_in_log__pytest_html4_0_2",
+    ),
+    tagData002(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data='<div class="test">Data</div>',
         in_html="&amp;lt;div class=&amp;quot;test&amp;quot;&amp;gt;Data&amp;lt;/div&amp;gt;",
         in_json='<div class=\\"test\\">Data</div>',
@@ -134,6 +177,14 @@ g_Data002: typing.List[tagData002] = [
     ),
     # Case 4: Different Entities in a Single String (Unescaping Greediness Check)
     tagData002(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data="Check: & &lt; &gt; \" '",
+        in_html="Check: &amp; &amp;lt; &amp;gt; \\&#34; &#39;",
+        in_json="Check: & &lt; &gt; \\\" '",
+        sign="mixed_entities__pytest_html4_0_2",
+    ),
+    tagData002(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data="Check: & &lt; &gt; \" '",
         in_html="Check: &amp;amp; &amp;amp;lt; &amp;amp;gt; &amp;quot; &amp;#x27;",
         in_json="Check: & &lt; &gt; \\\" '",
@@ -141,6 +192,7 @@ g_Data002: typing.List[tagData002] = [
     ),
     # Case 5: Backslashes (to avoid breaking JSON escaping)
     tagData002(
+        test_spec=None,
         data=r"Path C:\Users\Dima",
         in_html=r"Path C:\\Users\\Dima",
         in_json=r"Path C:\\Users\\Dima",  # JSON must double slashes
@@ -148,12 +200,28 @@ g_Data002: typing.List[tagData002] = [
     ),
     # --------------------------------------------------------------------
     tagData002(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data="<b>text<b>",
+        in_html="&lt;b&gt;text&lt;b&gt;",
+        in_json="<b>text<b>",
+        sign="html_with_bold_text__pytest_html4_0_2",
+    ),
+    tagData002(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data="<b>text<b>",
         in_html="&amp;lt;b&amp;gt;text&amp;lt;b&amp;gt;",
         in_json="<b>text<b>",
         sign="html_with_bold_text",
     ),
     tagData002(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data='<span style="font-weight: bold; color: red; font-size: 2em;">text</span>',
+        in_html="&lt;span style=\\&#34;font-weight: bold; color: red; font-size: 2em;\\&#34;&gt;text&lt;/span&gt;",
+        in_json='<span style=\\"font-weight: bold; color: red; font-size: 2em;\\">text</span>',
+        sign="html_with_bold_red_LARGE_text__pytest_html4_0_2",
+    ),
+    tagData002(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data='<span style="font-weight: bold; color: red; font-size: 2em;">text</span>',
         in_html="&amp;lt;span style=&amp;quot;font-weight: bold; color: red; font-size: 2em;&amp;quot;&amp;gt;text&amp;lt;/span&amp;gt;",
         in_json='<span style=\\"font-weight: bold; color: red; font-size: 2em;\\">text</span>',
@@ -177,6 +245,9 @@ def test_e2e_002__unescape_html_in_log(data002: tagData002):
     Verifies that json does not has "&quot;".
     """
     assert type(data002) is tagData002
+
+    if not test_spec.TestSpec.can_run(data002.test_spec):
+        helper__raise_skip__test_is_not_applicable()
 
     ws = E2EWorkspace(prefix="e2e_unescape_")
     try:
@@ -235,6 +306,7 @@ def test_e2e_002__unescape_html_in_log(data002: tagData002):
 # ------------------------------------------------------------------------
 @dataclasses.dataclass
 class tagData003:
+    test_spec: typing.Optional[str]
     data: str
     in_html: str
     in_json: str
@@ -245,6 +317,7 @@ class tagData003:
 # ------------------------------------------------------------------------
 g_Data003: typing.List[tagData003] = [
     tagData003(
+        test_spec=None,
         data="text",
         in_html="text",
         in_json="text",
@@ -252,6 +325,7 @@ g_Data003: typing.List[tagData003] = [
         sign="text",
     ),
     tagData003(
+        test_spec=None,
         data='"text"',
         in_html="\\&#34;text\\&#34;",
         in_json='\\"text\\"',
@@ -260,6 +334,7 @@ g_Data003: typing.List[tagData003] = [
     ),
     # Mark G. ------------------------------------------------------------
     tagData003(
+        test_spec=None,
         data='{"msg": "simple quote"}',
         in_html="{\\&#34;msg\\&#34;: \\&#34;simple quote\\&#34;}",
         in_json='{\\"msg\\": \\"simple quote\\"}',
@@ -267,6 +342,7 @@ g_Data003: typing.List[tagData003] = [
         sign="simple_quote",
     ),
     tagData003(
+        test_spec=None,
         data="Double &amp;quot;nested&amp;quot; test",
         in_html="Double &amp;amp;quot;nested&amp;amp;quot; test",
         in_json="Double &amp;quot;nested&amp;quot; test",
@@ -274,6 +350,7 @@ g_Data003: typing.List[tagData003] = [
         sign="double_nested_quotes",
     ),
     tagData003(
+        test_spec=None,
         data='<div class="test">Data</div>',
         in_html="&lt;div class=\\&#34;test\\&#34;&gt;Data&lt;/div&gt;",
         in_json='<div class=\\"test\\">Data</div>',
@@ -282,6 +359,7 @@ g_Data003: typing.List[tagData003] = [
     ),
     # Case 4: Different entities in one line
     tagData003(
+        test_spec=None,
         data="Check: & &lt; &gt; \" '",
         in_html="Check: &amp; &amp;lt; &amp;gt; \\&#34; &#39;",
         in_json="Check: & &lt; &gt; \\\" '",
@@ -290,6 +368,7 @@ g_Data003: typing.List[tagData003] = [
     ),
     # Case 5: Backslashes (to avoid breaking JSON escaping)
     tagData003(
+        test_spec=None,
         data="Path C:\\Users\\Dima",  # <------- ONE!
         in_html=r"Path C:\\\\Users\\\\Dima",  # <------- FOUR!!!
         in_json=r"Path C:\\\\Users\\\\Dima",  # <------- FOUR!!!
@@ -298,6 +377,7 @@ g_Data003: typing.List[tagData003] = [
     ),
     # --------------------------------------------------------------------
     tagData003(
+        test_spec=None,
         data="<b>text<b>",
         in_html="&lt;b&gt;text&lt;b&gt;",
         in_json="<b>text<b>",
@@ -305,6 +385,7 @@ g_Data003: typing.List[tagData003] = [
         sign="html_with_bold_text",
     ),
     tagData003(
+        test_spec=None,
         data='<span style="font-weight: bold; color: red; font-size: 2em;">text</span>',
         in_html="&lt;span style=\\&#34;font-weight: bold; color: red; font-size: 2em;\\&#34;&gt;text&lt;/span&gt;",
         in_json='<span style=\\"font-weight: bold; color: red; font-size: 2em;\\">text</span>',
@@ -330,6 +411,9 @@ def test_e2e_003__unescape_html_in_testId(request, data003: tagData003):
     """
     assert isinstance(request, pytest.FixtureRequest)
     assert type(data003) is tagData003
+
+    if not test_spec.TestSpec.can_run(data003.test_spec):
+        helper__raise_skip__test_is_not_applicable()
 
     ws = E2EWorkspace(prefix="e2e_unescape_")
     try:
@@ -397,6 +481,7 @@ def test_unescape(data): print("ha-ha")
 # ------------------------------------------------------------------------
 @dataclasses.dataclass
 class tagData004:
+    test_spec: typing.Optional[str]
     data: str
     in_html: str
     in_json: str
@@ -407,6 +492,7 @@ class tagData004:
 # ------------------------------------------------------------------------
 g_Data004: typing.List[tagData004] = [
     tagData004(
+        test_spec=None,
         data="text",
         in_html="text",
         in_json="text",
@@ -414,6 +500,15 @@ g_Data004: typing.List[tagData004] = [
         sign="text",
     ),
     tagData004(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data='"text"',
+        in_html="\\&#34;text\\&#34;",
+        in_json='\\"text\\"',
+        in_log='"text"',
+        sign="quoted_text__pytest_html4_0_2",
+    ),
+    tagData004(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data='"text"',
         in_html="&amp;quot;text&amp;quot;",
         in_json="&quot;text&quot;",
@@ -422,6 +517,15 @@ g_Data004: typing.List[tagData004] = [
     ),
     # Mark G. ------------------------------------------------------------
     tagData004(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data='{"msg": "simple quote"}',
+        in_html="{\\&#34;msg\\&#34;: \\&#34;simple quote\\&#34;}",
+        in_json='{\\"msg\\": \\"simple quote\\"}',
+        in_log='{"msg": "simple quote"}',
+        sign="simple_quote__pytest_html4_0_2",
+    ),
+    tagData004(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data='{"msg": "simple quote"}',
         in_html="{&amp;quot;msg&amp;quot;: &amp;quot;simple quote&amp;quot;}",
         in_json="{&quot;msg&quot;: &quot;simple quote&quot;}",
@@ -429,6 +533,15 @@ g_Data004: typing.List[tagData004] = [
         sign="simple_quote",
     ),
     tagData004(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data="Double &amp;quot;nested&amp;quot; test",
+        in_html="Double &amp;amp;quot;nested&amp;amp;quot;",
+        in_json="Double &amp;quot;nested&amp;quot; test",
+        in_log="Double &amp;quot;nested&amp;quot; test",
+        sign="double_nested_quotes__pytest_html4_0_2",
+    ),
+    tagData004(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data="Double &amp;quot;nested&amp;quot; test",
         in_html="Double &amp;amp;amp;quot;nested&amp;amp;amp;quot;",
         in_json="Double &amp;amp;quot;nested&amp;amp;quot; test",
@@ -436,6 +549,15 @@ g_Data004: typing.List[tagData004] = [
         sign="double_nested_quotes",
     ),
     tagData004(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data='<div class="test">Data</div>',
+        in_html="&lt;div class=\\&#34;test\\&#34;&gt;Data&lt;/div&gt;",
+        in_json='<div class=\\"test\\">Data</div>',
+        in_log='<div class="test">Data</div>',
+        sign="html_tags_in_log__pytest_html4_0_2",
+    ),
+    tagData004(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data='<div class="test">Data</div>',
         in_html="&amp;lt;div class=&amp;quot;test&amp;quot;&amp;gt;Data&amp;lt;/div&amp;gt;",
         in_json="&lt;div class=&quot;test&quot;&gt;Data&lt;/div&gt;",
@@ -443,6 +565,15 @@ g_Data004: typing.List[tagData004] = [
         sign="html_tags_in_log",
     ),
     tagData004(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data="Check: & &lt; &gt; \" '",
+        in_html="Check: &amp; &amp;lt; &amp;gt; \\&#34; &#39;",
+        in_json="Check: & &lt; &gt; \\\" '",
+        in_log="Check: & &lt; &gt; \" '",
+        sign="mixed_entities__pytest_html4_0_2",
+    ),
+    tagData004(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data="Check: & &lt; &gt; \" '",
         in_html="Check: &amp;amp; &amp;amp;lt; &amp;amp;gt; &amp;quot; &amp;#x27;",
         in_json="Check: &amp; &amp;lt; &amp;gt; &quot; &#x27;",
@@ -450,6 +581,7 @@ g_Data004: typing.List[tagData004] = [
         sign="mixed_entities",
     ),
     tagData004(
+        test_spec=None,
         data=r"Path C:\Users\Dima",
         in_html=r"Path C:\\Users\\Dima",
         in_json=r"Path C:\\Users\\Dima",
@@ -458,6 +590,15 @@ g_Data004: typing.List[tagData004] = [
     ),
     # --------------------------------------------------------------------
     tagData004(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data="<b>text<b>",
+        in_html="&lt;b&gt;text&lt;b&gt;",
+        in_json="<b>text<b>",
+        in_log="<b>text<b>",
+        sign="html_with_bold_text__pytest_html4_0_2",
+    ),
+    tagData004(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data="<b>text<b>",
         in_html="&amp;lt;b&amp;gt;text&amp;lt;b&amp;gt;",
         in_json="&lt;b&gt;text&lt;b&gt;",
@@ -465,6 +606,15 @@ g_Data004: typing.List[tagData004] = [
         sign="html_with_bold_text",
     ),
     tagData004(
+        test_spec="PYTEST_HTML<'4.1.0'",
+        data='<span style="font-weight: bold; color: red; font-size: 2em;">text</span>',
+        in_html="&lt;span style=\\&#34;font-weight: bold; color: red; font-size: 2em;\\&#34;&gt;text&lt;/span&gt;",
+        in_json='<span style=\\"font-weight: bold; color: red; font-size: 2em;\\">text</span>',
+        in_log='<span style="font-weight: bold; color: red; font-size: 2em;">text</span>',
+        sign="html_with_bold_red_LARGE_text__pytest_html4_0_2",
+    ),
+    tagData004(
+        test_spec="PYTEST_HTML>='4.1.0'",
         data='<span style="font-weight: bold; color: red; font-size: 2em;">text</span>',
         in_html="&amp;lt;span style=&amp;quot;font-weight: bold; color: red; font-size: 2em;&amp;quot;&amp;gt;text&amp;lt;/span&amp;gt;",
         in_json="&lt;span style=&quot;font-weight: bold; color: red; font-size: 2em;&quot;&gt;text&lt;/span&gt;",
@@ -489,6 +639,9 @@ def test_e2e_004__NO_unescape_html_in_log(data004: tagData004):
     Verifies that extractor does not touch log.
     """
     assert type(data004) is tagData004
+
+    if not test_spec.TestSpec.can_run(data004.test_spec):
+        helper__raise_skip__test_is_not_applicable()
 
     ws = E2EWorkspace(prefix="e2e_unescape_")
     try:

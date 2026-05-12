@@ -157,17 +157,19 @@ class PytestHtmlJsonExtractor:
         with open(input_path, "r", encoding="utf-8") as f:
             soup = bs4.BeautifulSoup(f, features="html.parser")
 
-        html_version = __class__._extract_pytest_html_version(
+        html_version_s = __class__._extract_pytest_html_version(
             input_path,
             soup,
         )
-        assert type(html_version) is str
+        assert type(html_version_s) is str
+
+        html_version = Version(html_version_s)
 
         min_version = Version(__class__.C_MININAL_PYTEST_HTML_VERSION)
-        if Version(html_version) < min_version:
+        if html_version < min_version:
             __class__._raise_err__unsupported_html_version(
                 input_path,
-                html_version,
+                html_version_s,
             )
 
         # load json data from the current report
@@ -193,7 +195,7 @@ class PytestHtmlJsonExtractor:
 
         if unescape_logs:
             jsondata = json.loads(jsonblob)
-            __class__._inplace_unescape_logs(jsondata)
+            __class__._inplace_unescape_logs(html_version, jsondata)
             jsonblob = json.dumps(jsondata, ensure_ascii=False)
             del jsondata  # memory is freed
 
@@ -211,11 +213,31 @@ class PytestHtmlJsonExtractor:
 
     # --------------------------------------------------------------------
     @staticmethod
-    def _inplace_unescape_logs(jsondata: typing.Any) -> None:
+    def _inplace_unescape_logs(
+        html_version: Version,
+        jsondata: typing.Any,
+    ) -> None:
+        if html_version >= Version("4.1.0"):
+            return __class__._inplace_unescape_logs__html4_1_0(
+                jsondata,
+            )
+
+        # it is old version
+        g_log.debug("Html escapes is not required ...")
+        return
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def _inplace_unescape_logs__html4_1_0(
+        jsondata: typing.Any,
+    ) -> None:
+        assert jsondata is not None
+
+        # https://github.com/pytest-dev/pytest-html/releases/tag/4.1.0
+        # fix: Escaping HTML in log (#757)
+
         C_DATA_ELEMENT_ID__TESTS = "tests"
         C_DATA_ELEMENT_ID__LOG = "log"
-
-        assert jsondata is not None
 
         g_log.debug("Html escapes in logs are unpacking ...")
 
