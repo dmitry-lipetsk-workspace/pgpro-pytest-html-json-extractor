@@ -5,6 +5,10 @@
 # pgpro-pytest-html-json-extractor
 A tool to extract json data from pytest-html report. Developed and maintained by Postgres Professional.
 
+## Key features
+- Extractor supports pytest-html v4.0.2+
+- Extractor produces JSON with unescaped HTML entities in log messages (for pytest-html v4.1.0+)
+
 ## Installation
 You can install the package directly from the repository (until it's published to PyPI):
 ```bash
@@ -27,10 +31,21 @@ pgpro-pytest-html-json-extractor report.html -o report.json
 | :--- | :--- | :--- | :--- | :--- |
 | `--version` | | No | Show program's version number and exit | None |
 | `--out` | `-o` | Yes | Name of the output JSON file | None |
-| `--verbose` | `-v` | No | Level of logging verbosity | 3 |
+| `--verbose` | `-v` | No | Level of logging verbosity | `3` |
 | `--no-check-json` | | No | Do not validate json data after extraction | None |
+| `--unescape-logs` | | No | HTML entity decoding mode for logs (`auto`, `yes`, `no`) | `auto` |
 | `--replace` | `-r` | No | Replace output if it exists | None |
 | `input` | | Yes | Positional argument for HTML file | None |
+
+#### Log Unescaping Modes (--unescape-logs)
+
+The tool provides granular control over how HTML entities (like `&quot;`, `&amp;` or `&#34;`) are handled within test logs:
+
+- **auto (Default)**: Smart detection mode. Automatically decides whether to decode entities based on the detected pytest-html report version. It ensures that logs are restored to their original "human-readable" state while maintaining the safety of other report metadata.
+
+- **yes**: Forceful decoding. Every HTML entity in the log field will be converted back to its literal character. Use this if you are dealing with heavily encoded custom output.
+
+- **no**: Raw mode. Disables all decoding, leaving the log data exactly as it was stored in the HTML source (including "Russian Doll" double-encoding). Ideal for debugging report structure or forensic data analysis.
 
 ## Contributing
 1. Fork the repository.

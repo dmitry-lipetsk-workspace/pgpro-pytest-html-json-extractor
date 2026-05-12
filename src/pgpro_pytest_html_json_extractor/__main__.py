@@ -9,6 +9,9 @@ import os
 import sys
 import re
 import typing
+import html
+import dataclasses
+import enum
 
 from . import __version__ as current_version
 
@@ -16,7 +19,19 @@ from packaging.version import Version
 
 # //////////////////////////////////////////////////////////////////////////////
 
-log = logging.getLogger(__name__)
+g_log = logging.getLogger(__name__)
+
+
+# //////////////////////////////////////////////////////////////////////////////
+
+
+class UnescapeLogsMode(enum.Enum):
+    AUTO = "auto"
+    YES = "yes"
+    NO = "no"
+
+    def __str__(self):
+        return self.value
 
 
 # //////////////////////////////////////////////////////////////////////////////
@@ -81,6 +96,17 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     command_parser.add_argument(
+        "--unescape-logs",
+        dest="unescape_logs",
+        type=UnescapeLogsMode,
+        choices=list(UnescapeLogsMode),
+        default=UnescapeLogsMode.AUTO,
+        help="Unescape HTML entities in logs (default: {})".format(
+            UnescapeLogsMode.AUTO.name,
+        ),
+    )
+
+    command_parser.add_argument(
         "--verbose",
         "-v",
         help="level of logging verbosity",
@@ -138,54 +164,149 @@ class PytestHtmlJsonExtractor:
         check_json: bool,
         output_path: str,
         replace: bool,
+        unescape_logs: UnescapeLogsMode = UnescapeLogsMode.AUTO,
     ):
         assert type(input_path) is str
         assert type(check_json) is bool
         assert type(output_path) is str
 
-        log.info("Processing report: {}".format(input_path))
+        g_log.info("Processing report: {}".format(input_path))
 
         with open(input_path, "r", encoding="utf-8") as f:
             soup = bs4.BeautifulSoup(f, features="html.parser")
 
-        html_version = __class__._extract_pytest_html_version(
+        html_version_s = __class__._extract_pytest_html_version(
             input_path,
             soup,
         )
-        assert type(html_version) is str
+        assert type(html_version_s) is str
+
+        html_version = Version(html_version_s)
 
         min_version = Version(__class__.C_MININAL_PYTEST_HTML_VERSION)
-        if Version(html_version) < min_version:
+        if html_version < min_version:
             __class__._raise_err__unsupported_html_version(
                 input_path,
-                html_version,
+                html_version_s,
             )
 
-        # load json data from the current report
-        containers = soup.select("#data-container")
-        if not containers:
-            __class__._raise_err__json_blob_is_not_found(input_path)
+        if html_version >= Version("4.1.0"):
+            adapter = __class__.sm_ReportAdapterForPytestHtml_4_1_0
+        else:
+            adapter = __class__.sm_ReportAdapterForPytestHtml_4_0_2
 
-        report_data_container = containers[0]
-        report_jsonblob = report_data_container.get("data-jsonblob")
+        extractCtx = __class__.tagExtractCtx(
+            soup,
+        )
 
-        if report_jsonblob is None:
-            __class__._raise_err__json_blob_is_not_found(
-                input_path,
-            )
+        assert isinstance(adapter.extractor_func, typing.Callable)
+        jsonblob = adapter.extractor_func(extractCtx)
 
-        assert type(report_jsonblob) is str
+        # memory is freed
+        del extractCtx
+        del soup
+
+        if unescape_logs == UnescapeLogsMode.AUTO:
+            unescape_logs = adapter.escapes_log
+
+        assert unescape_logs != UnescapeLogsMode.AUTO
+
+        if unescape_logs == UnescapeLogsMode.NO:
+            g_log.debug("Html escapes is skipped ...")
+        else:
+            jsondata = json.loads(jsonblob)
+            __class__._inplace_unescape_logs__html4_1_0(jsondata)
+            jsonblob = json.dumps(jsondata, ensure_ascii=False)
 
         if check_json:
-            log.info("Json data is checked...")
-            json.loads(report_jsonblob)
+            g_log.info("Json data is checked...")
+            json.loads(jsonblob)
 
         # write to file
         write_mode = "w" if replace else "x"
 
         with open(output_path, write_mode, encoding="utf-8") as f:
-            f.write(report_jsonblob)
+            f.write(jsonblob)
 
+        return
+
+    # --------------------------------------------------------------------
+    @dataclasses.dataclass
+    class tagExtractCtx:
+        soup: bs4.BeautifulSoup
+
+    # --------------------------------------------------------------------
+    # @staticmethod
+    def _extract_json_from_html_4_0_2(ctx: tagExtractCtx):
+        assert type(ctx) is __class__.tagExtractCtx
+
+        containers = ctx.soup.select("#data-container")
+        if not containers:
+            __class__._raise_err__json_blob_is_not_found()
+
+        report_data_container = containers[0]
+
+        jsonblob = report_data_container.get("data-jsonblob")
+
+        # ----------
+        if jsonblob is None:
+            __class__._raise_err__json_blob_is_not_found()
+
+        assert type(jsonblob) is str
+
+        return jsonblob
+
+    # --------------------------------------------------------------------
+    @staticmethod
+    def _inplace_unescape_logs__html4_1_0(
+        jsondata: typing.Any,
+    ) -> None:
+        assert jsondata is not None
+
+        # https://github.com/pytest-dev/pytest-html/releases/tag/4.1.0
+        # fix: Escaping HTML in log (#757)
+
+        C_DATA_ELEMENT_ID__TESTS = "tests"
+        C_DATA_ELEMENT_ID__LOG = "log"
+
+        g_log.debug("Html escapes in logs are unpacking ...")
+
+        if type(jsondata) is not dict:
+            return
+
+        tests = jsondata.get(C_DATA_ELEMENT_ID__TESTS)
+
+        if tests is None:
+            return
+
+        if type(tests) is not dict:
+            return
+
+        for _, test_launches in tests.items():
+            if test_launches is None:
+                continue
+
+            if type(test_launches) is not list:
+                continue
+
+            for t in test_launches:
+                if t is None:
+                    continue
+
+                if type(t) is not dict:
+                    continue
+
+                log_data = t.get(C_DATA_ELEMENT_ID__LOG)
+
+                if log_data is None:
+                    continue
+
+                if type(log_data) is not str:
+                    continue
+
+                t[C_DATA_ELEMENT_ID__LOG] = html.unescape(log_data)
+                continue
+            continue
         return
 
     # --------------------------------------------------------------------
@@ -226,15 +347,27 @@ class PytestHtmlJsonExtractor:
 
     # --------------------------------------------------------------------
     @staticmethod
-    def _raise_err__json_blob_is_not_found(
-        report_path: str,
-    ) -> typing.NoReturn:
-        assert report_path is not None
-
-        err_msg = "Source file [{}] does not countains json data.".format(
-            report_path,
-        )
+    def _raise_err__json_blob_is_not_found() -> typing.NoReturn:
+        err_msg = "Source file does not countains json data."
         raise RuntimeError(err_msg)
+
+    # --------------------------------------------------------------------
+    @dataclasses.dataclass
+    class tagReportAdapter:
+        extractor_func: typing.Callable
+        escapes_log: UnescapeLogsMode
+
+    # --------------------------------------------------------------------
+    sm_ReportAdapterForPytestHtml_4_0_2 = tagReportAdapter(
+        extractor_func=_extract_json_from_html_4_0_2,
+        escapes_log=UnescapeLogsMode.NO,
+    )
+
+    # --------------------------------------------------------------------
+    sm_ReportAdapterForPytestHtml_4_1_0 = tagReportAdapter(
+        extractor_func=_extract_json_from_html_4_0_2,
+        escapes_log=UnescapeLogsMode.YES,
+    )
 
 
 # //////////////////////////////////////////////////////////////////////////////
@@ -246,7 +379,7 @@ def main(arguments) -> int:
     # 1. Collect from positional files
     input_file = os.path.abspath(arguments.input)
     if not os.path.isfile(input_file):
-        log.error(
+        g_log.error(
             "Invalid input: '{}' is not a file or does not exist.".format(
                 arguments.input,
             ),
@@ -255,7 +388,7 @@ def main(arguments) -> int:
 
     # 2. Check output file
     if not arguments.replace and os.path.exists(arguments.out):
-        log.error(
+        g_log.error(
             "Invalid input: output file '{}' already exists.".format(
                 arguments.out,
             ),
@@ -264,7 +397,7 @@ def main(arguments) -> int:
 
     # 3. Final check
     if has_errors:
-        log.error(
+        g_log.error(
             "Termination due to input errors.",
         )
         return 1
@@ -275,9 +408,10 @@ def main(arguments) -> int:
         arguments.check_json,
         arguments.out,
         arguments.replace,
+        arguments.unescape_logs,
     )
 
-    log.info(
+    g_log.info(
         "Successfully extracted json into {}".format(
             arguments.out,
         ),
@@ -293,11 +427,11 @@ def cli():
 
     logging.basicConfig(level=int((6 - arguments.verbose) * 10))
 
-    log.debug("opts = {}".format(arguments))
+    g_log.debug("opts = {}".format(arguments))
 
     r = main(arguments)
 
-    log.debug("exiting")
+    g_log.debug("exiting")
     return r
 
 
